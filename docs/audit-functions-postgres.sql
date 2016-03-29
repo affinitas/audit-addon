@@ -1,14 +1,27 @@
+--
+-- toc:
+--
+-- audit.if_modified_func() -- one trigger function for all purposes
+-- audit.audit_table(target_table regclass)  -- start audit on a table
+-- audit.leave_table(target_table regclass)  -- stop audit on a table
+-- audit.snapshot(target_table) -- stop audit on a table
+--
+
+
+---
+---
+---
 
 CREATE OR REPLACE FUNCTION audit.if_modified_func() RETURNS TRIGGER AS $body$
 DECLARE
   audit_row audit.events;
   query_text text;
-  all_rows json[];
+  all_rows json[] := '{}';
   anyrow RECORD;
 BEGIN
-  IF TG_WHEN <> 'AFTER' THEN
-    RAISE EXCEPTION 'audit.if_modified_func() may only run as an AFTER trigger';
-  END IF;
+  -- IF TG_WHEN <> 'AFTER' THEN
+  --   RAISE EXCEPTION 'audit.if_modified_func() may only run as an AFTER trigger';
+  -- END IF;
 
   audit_row = ROW (
               TG_TABLE_SCHEMA::TEXT,               -- nspname
@@ -22,16 +35,15 @@ BEGIN
   );
 
   IF    (TG_OP = 'UPDATE') THEN
-    -- audit_row.rowdata := all_rows || row_to_json(OLD) || row_to_json(NEW);
     audit_row.rowdata = array_to_json(ARRAY[row_to_json(OLD), row_to_json(NEW)]);  -- save both rows
   ELSIF (TG_OP = 'DELETE') THEN
     audit_row.rowdata = row_to_json(OLD);                                            -- save old row
   ELSIF (TG_OP = 'INSERT') THEN
     audit_row.rowdata = row_to_json(NEW);                                            -- save new row
   ELSIF (TG_OP = 'TRUNCATE') THEN                                                    -- save all rows
-    query_text = 'SELECT row_to_json(t) FROM (select *  from ' || quote_ident(TG_TABLE_SCHEMA) || '.' || quote_ident(TG_TABLE_NAME) ||') t';
+    query_text = 'SELECT *  FROM ' || quote_ident(TG_TABLE_SCHEMA) || '.' || quote_ident(TG_TABLE_NAME) ;
     FOR anyrow IN EXECUTE query_text LOOP
-        all_rows = all_rows || row_to_json(anyrow);
+        all_rows =  all_rows || row_to_json(anyrow);
     END LOOP;
     audit_row.rowdata = array_to_json(all_rows);
   ELSE
@@ -55,8 +67,6 @@ $body$
 LANGUAGE plpgsql
 SECURITY DEFINER;
 
-SET search_path = pg_catalog, public;
-
 
 COMMENT ON FUNCTION audit.if_modified_func() IS $body$
 Track changes to a table at the row level.
@@ -65,6 +75,9 @@ cannot obtain the active role because it is reset by the SECURITY DEFINER invoca
 of the audit trigger its self.
 $body$;
 
+---
+---
+---
 
 CREATE OR REPLACE FUNCTION audit.audit_table(target_table regclass) RETURNS void AS $body$
 DECLARE
@@ -79,7 +92,7 @@ BEGIN
         RAISE NOTICE '%', query_text;
         EXECUTE query_text;
 
-    query_text = 'CREATE TRIGGER audit_trigger_stm AFTER TRUNCATE ON ' ||
+    query_text = 'CREATE TRIGGER audit_trigger_stm BEFORE TRUNCATE ON ' ||
                  quote_ident(target_table::TEXT) ||
                  ' FOR EACH STATEMENT EXECUTE PROCEDURE audit.if_modified_func();';
         RAISE NOTICE '%', query_text;
@@ -94,3 +107,34 @@ Add auditing support to a table.
 Arguments:
    target_table:     Table name, schema qualified if not on search_path
 $body$;
+
+---
+---
+---
+
+CREATE OR REPLACE FUNCTION audit.leave_table(target_table regclass) RETURNS void AS $body$
+DECLARE
+BEGIN
+    EXECUTE 'DROP TRIGGER IF EXISTS audit_trigger_row ON ' || quote_ident(target_table::TEXT);
+    EXECUTE 'DROP TRIGGER IF EXISTS audit_trigger_stm ON ' || quote_ident(target_table::TEXT);
+END;
+$body$
+language 'plpgsql';
+
+COMMENT ON FUNCTION audit.audit_table(regclass) IS $body$
+Remove auditing from a table.
+
+Arguments:
+   target_table:     Table name, schema qualified if not on search_path
+$body$;
+
+---
+---
+---
+
+
+CREATE OR REPLACE FUNCTION audit.snapshot_table(target_table regclass) RETURNS void AS $body$
+DECLARE
+BEGIN
+
+END; $body$ language 'plpgsql';

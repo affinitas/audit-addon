@@ -1,13 +1,23 @@
 
+-- install audit schema
+-- set up test tables with auditdb-example sql.
 
-select * from audit.events;
+select audit.leave_table('ae_a');
+select audit.leave_table('ae_b');
+select audit.leave_table('ae_c');
+
+
+
+truncate audit.events;
+truncate ae_a CASCADE;
+truncate ae_b;
+truncate ae_c;
 
 select audit.audit_table('ae_a');
 select audit.audit_table('ae_b');
 select audit.audit_table('ae_c');
 
-TRUNCATE ae_c;
--- truncate empty table result in event with empty rowdata
+TRUNCATE ae_c;  -- truncate empty tabel results in event entry with no rows
 
 INSERT INTO ae_a(a_text, a_number, a_decimal) VALUES
   ('Lorem', 382, 223.93992    ),
@@ -30,8 +40,8 @@ INSERT INTO ae_b(a_text, a_date, a_time) VALUES
   ('sit'  , '1973-10-22'::date, '18:12'::time),
   ('ipsum', '1934-01-11'::date, '03:55'::time);
 
+-- trunc
 TRUNCATE ae_b;
--- truncate works but audit failed: no rowdata
 
 INSERT INTO ae_b(a_text, a_date, a_time) VALUES
   ('dolor', '2013-08-08'::date, '12:15'::time),
@@ -60,11 +70,11 @@ INSERT INTO ae_c(test_key, test_value) VALUES
 
 
 UPDATE ae_c
-  SET test_key = md5(random()::text)
-  WHERE NOT test_key LIKE '%aaa%';
+  SET test_key = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  WHERE test_key =  'd75b9066192929d86983fc46ccff0125';
 
 DELETE FROM ae_c
-  WHERE NOT test_key LIKE '%aaa%';
+  WHERE test_key =  '92dcc301ec35ed74eaaf68978fc56b94';
 
 DELETE FROM ae_c;
 
@@ -75,8 +85,3 @@ select * from audit.events;
 -- SELECT generate_series(1,10) AS id, random() AS descr;
 -- SELECT generate_series(1,10) AS id, NOW() - '1 year'::INTERVAL * (RANDOM() * 100) AS descr;
 -- SELECT generate_series(1,10) AS id, md5(random()::text) AS descr;
-
-[
-{"test_key": "d5e9a73ab35d7506510960eb37af563b", "test_value": "Pellentesque imperdiet.       ", "last_modified": "2016-03-24T17:02:26.324275+01:00", "last_modified_by": "ckoch"}
-{"test_key": "aaaa"                            , "test_value": "Pellentesque imperdiet.       ", "last_modified": "2016-03-24T17:07:05.303777+01:00", "last_modified_by": "ckoch"}
-]
