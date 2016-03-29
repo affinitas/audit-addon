@@ -1,8 +1,9 @@
 
-DROP TABLE IF EXISTS ae_a;
-DROP TABLE IF EXISTS ae_b;
 DROP TABLE IF EXISTS ae_c;
 DROP FUNCTION IF EXISTS last_modified_before();
+DROP TABLE IF EXISTS ae_b;
+DROP TABLE IF EXISTS ae_a;
+
 
 CREATE TABLE ae_a (
   a_text    TEXT PRIMARY KEY,
@@ -10,6 +11,7 @@ CREATE TABLE ae_a (
   a_decimal DECIMAL
 );
 
+-- foreign key
 CREATE TABLE ae_b (
   a_serial SERIAL PRIMARY KEY,
   a_text   TEXT NOT NULL  REFERENCES ae_a (a_text) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -17,6 +19,7 @@ CREATE TABLE ae_b (
   a_time   TIME
 );
 
+-- trigger and no primary
 CREATE TABLE ae_c (
   test_key         CHARACTER VARYING(128) NOT NULL,
   test_value       TEXT,
@@ -42,3 +45,5 @@ EXECUTE PROCEDURE last_modified_before();
 --
 -- TODO: add more data types to the test tables
 --
+
+
